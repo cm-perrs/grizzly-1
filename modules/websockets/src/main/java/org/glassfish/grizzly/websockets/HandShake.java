@@ -260,18 +260,31 @@ public abstract class HandShake {
     }
 
     private void determineHostAndPort(MimeHeaders headers) {
-        String header;
-        header = readHeader(headers, "host");
-        final int i = header == null ? -1 : header.indexOf(":");
-        if (i == -1) {
-            serverHostName = header;
-            port = 80;
-        } else {
-            assert header != null;
-            
-            serverHostName = header.substring(0, i);
-            port = Integer.parseInt(header.substring(i + 1));
-        }
+		String header = readHeader(headers, "host");
+
+		if (header == null) {
+			serverHostName = null;
+			port = 80;
+			return;
+		}
+
+		final Pattern pattern = Pattern.compile("^(.+?)(:(\\d{1,5}))?$");
+		final Matcher matcher = pattern.matcher(header);
+		if (matcher.matches()) {
+			try {
+				serverHostName = InetAddress.getByName(matcher.group(1)).getHostName();
+			} catch (UnknownHostException e) {
+				// unlikely
+				throw new HandshakeException("Invalid hostname in handshake.");
+			}
+			if (matcher.group(3) == null) {
+				port = 80;
+			} else {
+				port = Integer.parseInt(matcher.group(3));
+			}
+		} else {
+			throw new HandshakeException("Invalid hostname or port in handshake.");
+		}
     }
 
     public HttpContent composeHeaders() {
